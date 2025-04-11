@@ -1,0 +1,38 @@
+.registration-paper {
+  margin-top: 3rem;
+  padding: 2rem;
+  background: linear-gradient(to bottom right, #ffffff, #f8f9fa);
+}
+
+.registration-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2rem;
+}
+
+.qr-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 2rem;
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  margin: 1rem 0;
+}
+
+.qr-code {
+  padding: 1rem;
+  background-color: white;
+  border-radius: 4px;
+  margin: 1rem 0;
+}
+
+.submit-button {
+  margin-top: 2rem;
+  padding: 1rem;
+  font-size: 1.1rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
