@@ -1,8 +1,10 @@
 import './App.css';
 import { useState, useRef } from 'react';
-import { MdPersonAdd, MdLogin, MdLogout } from 'react-icons/md';
+import { MdPersonAdd, MdLogin, MdLogout, MdAssignment } from 'react-icons/md';
 import { TextField, Alert } from '@mui/material';
 import Registration from './components/Registration/Registration';
+import PhotoCountdown from './components/PhotoCountdown/PhotoCountdown';
+import Admin from './components/Admin/Admin';
 
 function App() {
   const [activeButton, setActiveButton] = useState(null);
@@ -14,6 +16,9 @@ function App() {
   const [status, setStatus] = useState(null);
   const clockInInputRef = useRef(null);
   const clockOutInputRef = useRef(null);
+  const [showPhotoCountdown, setShowPhotoCountdown] = useState(false);
+  const [currentClockType, setCurrentClockType] = useState(null);
+  const [showAdmin, setShowAdmin] = useState(false);
 
   const handleButtonHover = (button) => {
     setActiveButton(button);
@@ -33,6 +38,44 @@ function App() {
     }
   };
 
+  const handlePhotoTaken = async (imageSrc) => {
+    try {
+      // Update the attendance record with the photo
+      const response = await fetch(`http://localhost:3001/api/clock/${currentClockType}/photo`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          image: imageSrc
+        }),
+      });
+
+      if (response.ok) {
+        setShowPhotoCountdown(false); // Hide the countdown first
+        setStatus({
+          success: true,
+          message: `Clock ${currentClockType} completed with photo`
+        });
+        // Clear final status after showing completion message
+        setTimeout(() => {
+          setStatus(null);
+        }, 3000);
+      } else {
+        throw new Error('Failed to save attendance photo');
+      }
+    } catch (err) {
+      setShowPhotoCountdown(false);
+      setStatus({
+        success: false,
+        message: 'Failed to save attendance photo'
+      });
+      setTimeout(() => {
+        setStatus(null);
+      }, 3000);
+    }
+  };
+
   const handleVerification = async (type, code) => {
     try {
       const response = await fetch(`http://localhost:3001/api/clock/${type}`, {
@@ -44,11 +87,11 @@ function App() {
       });
 
       const data = await response.json();
-
+      console.log(data)
       if (response.ok) {
         setStatus({
           success: true,
-          message: `Clock ${type} successful! Welcome ${data.employeeId}`
+          message: `Clock ${type} ${data.employeeId} successful! Please face the camera for attendance photo`
         });
         // Clear the input and hide it
         if (type === 'in') {
@@ -58,6 +101,11 @@ function App() {
           setClockOutPin('');
           setShowClockOut(false);
         }
+        setCurrentClockType(type);
+        // Show photo countdown after successful verification
+        setTimeout(() => {
+          setShowPhotoCountdown(true);
+        }, 1000);
       } else {
         throw new Error(data.error || `Clock ${type} failed`);
       }
@@ -66,12 +114,11 @@ function App() {
         success: false,
         message: err.message
       });
+      // Clear error status after 3 seconds
+      setTimeout(() => {
+        setStatus(null);
+      }, 3000);
     }
-
-    // Clear status after 3 seconds
-    setTimeout(() => {
-      setStatus(null);
-    }, 3000);
   };
 
   const handleButtonClick = (component) => {
@@ -79,10 +126,12 @@ function App() {
       setSelectedComponent('registration');
       setShowClockIn(false);
       setShowClockOut(false);
+      setShowAdmin(false);
     } else if (component === 'clockin') {
       setShowClockIn(prev => !prev);
       setShowClockOut(false);
       setSelectedComponent(null);
+      setShowAdmin(false);
       if (!showClockIn) {
         setTimeout(() => clockInInputRef.current?.focus(), 100);
       }
@@ -90,9 +139,15 @@ function App() {
       setShowClockOut(prev => !prev);
       setShowClockIn(false);
       setSelectedComponent(null);
+      setShowAdmin(false);
       if (!showClockOut) {
         setTimeout(() => clockOutInputRef.current?.focus(), 100);
       }
+    } else if (component === 'check') {
+      setShowAdmin(true);
+      setShowClockIn(false);
+      setShowClockOut(false);
+      setSelectedComponent(null);
     }
   };
 
@@ -166,6 +221,18 @@ function App() {
               />
             )}
           </div>
+
+          <div className="button-group">
+            <button
+              className={`attendance-button check ${activeButton === 'check' ? 'active' : ''}`}
+              onMouseEnter={() => handleButtonHover('check')}
+              onMouseLeave={() => handleButtonHover(null)}
+              onClick={() => handleButtonClick('check')}
+            >
+              <MdAssignment className="button-icon" />
+              <span>Check</span>
+            </button>
+          </div>
         </div>
 
         {status && (
@@ -178,6 +245,13 @@ function App() {
         )}
 
         {selectedComponent === 'registration' && <Registration />}
+        {showPhotoCountdown && (
+          <PhotoCountdown
+            onPhotoTaken={handlePhotoTaken}
+            onClose={() => setShowPhotoCountdown(false)}
+          />
+        )}
+        {showAdmin && <Admin />}
       </div>
     </div>
   );

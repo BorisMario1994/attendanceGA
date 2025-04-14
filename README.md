@@ -25,11 +25,22 @@ npm install express mssql cors dotenv speakeasy express-validator --save
 npm install nodemon --save-dev
 ```
 
-Create a .env file in the backend directory with these settings:
+Set up your configuration files:
+1. Copy `.env.template` to `.env` and update with your database credentials:
+```bash
+cp .env.template .env
 ```
-DB_HOST=localhost
-DB_USER=sa
-DB_PASSWORD=your_password
+
+2. Copy `db.template.js` to `db.js` in the `src/config` directory:
+```bash
+cp src/config/db.template.js src/config/db.js
+```
+
+3. Update the `.env` file with your database credentials:
+```
+DB_HOST=your_database_host
+DB_USER=your_database_user
+DB_PASSWORD=your_database_password
 DB_NAME=attendance_db
 PORT=3001
 ```
@@ -87,6 +98,26 @@ The application will be available at http://localhost:3000
    - Check if all dependencies are installed
    - Clear browser cache
    - Verify backend URL in API calls
+
+## Configuration Files
+
+The project uses several configuration files that should not be committed to version control:
+
+- `.env`: Contains database credentials and other sensitive settings
+- `src/config/db.js`: Database configuration file
+
+Template files are provided for these configurations:
+- `.env.template`: Template for environment variables
+- `src/config/db.template.js`: Template for database configuration
+
+Always use the template files as a base and create your own local copies with actual credentials.
+
+## Security Notes
+
+- Never commit the `.env` file or `db.js` to version control
+- Keep your Google Authenticator QR codes private
+- Regularly rotate database credentials in production
+- Use strong passwords for database access
 
 ## Support
 

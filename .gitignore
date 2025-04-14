@@ -3,48 +3,96 @@ node_modules/
 /.pnp
 .pnp.js
 
-# Environment variables
+# Environment variables and sensitive data
 .env
+.env.*
+*.env
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
+config.json
+*config*.json
+secrets.json
+*secrets*.json
+credentials.json
+*credentials*.json
+
+# Database files and configurations
+*.mdf
+*.ldf
+*.ndf
+*.bak
+*.dbf
+database.config.js
+db.config.js
+*connection*.json
+src/config/db.js  # Adding specific database configuration file
+**/config/db.js   # Adding any db.js in config folders
+
+# SQL files with sensitive data
+**/config/local.*.sql
+**/config/dev.*.sql
+**/config/prod.*.sql
 
 # Debug logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+*.log
 
 # Build outputs
 /build
 /dist
+build/
+dist/
 
 # IDE specific files
 .vscode/
 .idea/
 *.swp
 *.swo
+*.sublime-*
+.project
+.classpath
+.settings/
 
 # Operating System Files
 .DS_Store
 Thumbs.db
+*.tmp
+desktop.ini
+~$*
 
-# SQL Server
-*.mdf
-*.ldf
-*.ndf
+# SSL/TLS Certificates
+*.pem
+*.key
+*.crt
+*.cer
+*.der
+*.pfx
+*.p12
+
+# Testing
+/coverage
+.nyc_output
 
 # Temporary files
 *.log
 *.tmp
 tmp/
 temp/
+.cache/
 
-# Testing
-/coverage
+# API keys and tokens
+*apikey*
+*token*
+*secret*
+*password*
+*credential*
 
-# Production
-/build
-
-# misc
-*.pem
+# Local development configurations
+local.settings.json
+appsettings.*.json
+config.*.js
+.env.*.local

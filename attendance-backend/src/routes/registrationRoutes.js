@@ -12,7 +12,7 @@ router.post(
             .isNumeric()
             .withMessage('Employee ID must be exactly 8 digits')
     ],
-    registrationController.register
+    registrationController.registerEmployee
 );
 
 router.post(

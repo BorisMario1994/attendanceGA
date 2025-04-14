@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { TextField, Button, Paper, Box, Typography, Container, Alert } from '@mui/material';
+import WebcamCapture from '../WebcamCapture/WebcamCapture';
 import './Registration.css';
 
 const Registration = () => {
@@ -10,6 +11,8 @@ const Registration = () => {
   const [isRegistered, setIsRegistered] = useState(false);
   const [verificationCode, setVerificationCode] = useState('');
   const [verificationStatus, setVerificationStatus] = useState(null);
+  const [showWebcam, setShowWebcam] = useState(false);
+  const [photo, setPhoto] = useState(null);
 
   const validateEmployeeId = (id) => {
     return /^\d{8}$/.test(id);
@@ -76,11 +79,20 @@ const Registration = () => {
     };
   }, []);
 
+  const handlePhotoCapture = async (imageSrc) => {
+    setPhoto(imageSrc);
+    setShowWebcam(false);
+  };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
     if (!validateEmployeeId(employeeId)) {
       setError('Please enter a valid 8-digit employee ID');
+      return;
+    }
+
+    if (!photo) {
+      setError('Please take a photo first');
       return;
     }
 
@@ -91,7 +103,8 @@ const Registration = () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          employeeId
+          employeeId,
+          photo: photo
         }),
       });
 
@@ -125,11 +138,42 @@ const Registration = () => {
             value={employeeId}
             onChange={handleEmployeeIdChange}
             error={!!error}
-           // helperText={error}
             placeholder="Enter 8-digit Employee ID"
             margin="normal"
             disabled={isRegistered}
           />
+
+          <Box className="photo-container" sx={{ mt: 3, width: '100%' }}>
+            {photo ? (
+              <Box className="relative">
+                <img 
+                  src={photo} 
+                  alt="Registration" 
+                  className="w-64 h-64 object-cover rounded-lg"
+                />
+                <Button
+                  onClick={() => setShowWebcam(true)}
+                  className="mt-2 w-full text-sm text-blue-600 hover:text-blue-700"
+                >
+                  Retake Photo
+                </Button>
+              </Box>
+            ) : (
+              <Button
+                onClick={() => setShowWebcam(true)}
+                className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition-colors"
+              >
+                Take Photo
+              </Button>
+            )}
+          </Box>
+
+          {showWebcam && (
+            <WebcamCapture
+              onCapture={handlePhotoCapture}
+              onClose={() => setShowWebcam(false)}
+            />
+          )}
 
           {qrCodeData && (
             <Box className="qr-container">
@@ -156,7 +200,6 @@ const Registration = () => {
                   placeholder="Enter 6-digit code"
                   margin="normal"
                   error={!!error && error.includes('code')}
-                 
                 />
                 <Button
                   variant="contained"
@@ -186,12 +229,17 @@ const Registration = () => {
             size="large"
             fullWidth
             onClick={handleSubmit}
-            disabled={!employeeId || !!error || isRegistered}
+            disabled={!employeeId || !photo || !!error || isRegistered}
             className="submit-button"
           >
             {isRegistered ? 'Registered' : 'Register'}
           </Button>
         </Box>
+        {error && (
+          <Box className="mt-4">
+            <Alert severity="error">{error}</Alert>
+          </Box>
+        )}
       </Paper>
     </Container>
   );

@@ -1,0 +1,52 @@
+.admin-paper {
+    margin-top: 3rem;
+    padding: 2rem;
+    background: linear-gradient(to bottom right, #ffffff, #f8f9fa);
+}
+
+.admin-container {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+}
+
+.controls-container {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.results-container {
+    overflow-x: auto;
+}
+
+.results-grid {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.grid-header {
+    display: grid;
+    grid-template-columns: 100px 200px 200px 200px 100px 100px;
+    gap: 1rem;
+    padding: 1rem;
+    background-color: #f5f5f5;
+    font-weight: bold;
+}
+
+.grid-row {
+    display: grid;
+    grid-template-columns: 100px 200px 200px 200px 100px 100px;
+    gap: 1rem;
+    padding: 1rem;
+    border-bottom: 1px solid #eee;
+    align-items: center;
+}
+
+.result-image {
+    width: 150px;
+    height: 150px;
+    object-fit: cover;
+    border-radius: 4px;
+}

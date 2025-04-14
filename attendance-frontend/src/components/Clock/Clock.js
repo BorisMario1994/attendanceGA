@@ -35,7 +35,7 @@ const Clock = ({ type }) => {
       if (response.ok) {
         setStatus({
           success: true,
-          message: `Clock ${type} successful! Welcome ${data.employeeId}`
+          message: `Clock ${type} successful!`
         });
         setPinCode(''); // Clear the input
       } else {
