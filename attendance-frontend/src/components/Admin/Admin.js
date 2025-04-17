@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { TextField, Button, Paper, Box, Typography, Container, Alert, FormControl, InputLabel, Select, MenuItem } from '@mui/material';
+import { TextField, Button, Paper, Box, Typography, Container, Alert, FormControl, InputLabel, Select, MenuItem, IconButton } from '@mui/material';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import { ChevronLeft, ChevronRight } from '@mui/icons-material';
 import format from 'date-fns/format';
 import './Admin.css';
 
@@ -16,6 +17,8 @@ const Admin = () => {
     const [type, setType] = useState('clockin');
     const [results, setResults] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 5;
 
     const handleLogin = async (e) => {
         e.preventDefault();
@@ -67,6 +70,7 @@ const Admin = () => {
 
         try {
             setLoading(true);
+            setCurrentPage(1); // Reset to first page when new results are loaded
             // Format dates to YYYY-MM-DD format
             const formattedDateFrom = format(dateFrom, 'yyyy-MM-dd');
             const formattedDateTo = format(dateTo, 'yyyy-MM-dd');
@@ -90,6 +94,20 @@ const Admin = () => {
         } finally {
             setLoading(false);
         }
+    };
+
+    // Calculate pagination
+    const totalPages = Math.ceil(results.length / itemsPerPage);
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const currentResults = results.slice(startIndex, endIndex);
+
+    const handlePreviousPage = () => {
+        setCurrentPage(prev => Math.max(prev - 1, 1));
+    };
+
+    const handleNextPage = () => {
+        setCurrentPage(prev => Math.min(prev + 1, totalPages));
     };
 
     if (!isLoggedIn) {
@@ -204,14 +222,14 @@ const Admin = () => {
                         <Box className="results-container" sx={{ mt: 4 }}>
                             <div className="results-grid">
                                 <div className="grid-header">
-                                    <div>Type</div>
+                                    <div>Employee Id</div>
                                     <div>Date</div>
                                     <div>Clock Photo</div>
                                     <div>Registration Photo</div>
                                     <div>Confidence</div>
                                     <div>Match</div>
                                 </div>
-                                {results.map((result) => (
+                                {currentResults.map((result) => (
                                     <div key={result.AttendanceId} className="grid-row">
                                         <div>{result.EmployeeId}</div>
                                         <div>{new Date(result.AttendanceDate).toLocaleDateString()}</div>
@@ -221,7 +239,6 @@ const Admin = () => {
                                                 alt="Clock" 
                                                 className="result-image"
                                             />
-                                            
                                         </div>
                                         <div>
                                             <img 
@@ -235,6 +252,27 @@ const Admin = () => {
                                     </div>
                                 ))}
                             </div>
+                            
+                            {/* Pagination Controls */}
+                            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', mt: 2, gap: 2 }}>
+                                <IconButton 
+                                    onClick={handlePreviousPage} 
+                                    disabled={currentPage === 1}
+                                    color="primary"
+                                >
+                                    <ChevronLeft />
+                                </IconButton>
+                                <Typography>
+                                    Page {currentPage} of {totalPages}
+                                </Typography>
+                                <IconButton 
+                                    onClick={handleNextPage} 
+                                    disabled={currentPage === totalPages}
+                                    color="primary"
+                                >
+                                    <ChevronRight />
+                                </IconButton>
+                            </Box>
                         </Box>
                     )}
                 </Box>
