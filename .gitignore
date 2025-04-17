@@ -11,6 +11,9 @@ node_modules/
 .env.development.local
 .env.test.local
 .env.production.local
+attendance-backend/.env
+attendance-backend/src/.env
+**/.env
 config.json
 *config*.json
 secrets.json
