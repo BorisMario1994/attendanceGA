@@ -20,16 +20,32 @@ const Admin = () => {
     const handleLogin = async (e) => {
         e.preventDefault();
         try {
+            console.log("Attempting login...");
             const response = await fetch('http://localhost:3001/api/admin/login', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                },
+                }, 
                 body: JSON.stringify({ username, password }),
             });
-
-            const data = await response.json();
-
+            
+            console.log("Response status:", response.status);
+            
+            // Log the raw response
+            const responseText = await response.text();
+            console.log("Raw response:", responseText);
+            
+            // Try to parse as JSON
+            let data;
+            try {
+                data = JSON.parse(responseText);
+            } catch (parseError) {
+                console.error("JSON parse error:", parseError);
+                throw new Error("Invalid response format from server");
+            }
+            
+            console.log("Parsed response:", data);
+            
             if (response.ok) {
                 setIsLoggedIn(true);
                 localStorage.setItem('adminToken', data.token);
@@ -38,6 +54,7 @@ const Admin = () => {
                 throw new Error(data.error || 'Login failed');
             }
         } catch (err) {
+            console.error("Full error details:", err);
             setError(err.message);
         }
     };
@@ -196,7 +213,7 @@ const Admin = () => {
                                 </div>
                                 {results.map((result) => (
                                     <div key={result.AttendanceId} className="grid-row">
-                                        <div>{result.AttendanceType}</div>
+                                        <div>{result.EmployeeId}</div>
                                         <div>{new Date(result.AttendanceDate).toLocaleDateString()}</div>
                                         <div>
                                             <img 
@@ -204,6 +221,7 @@ const Admin = () => {
                                                 alt="Clock" 
                                                 className="result-image"
                                             />
+                                            
                                         </div>
                                         <div>
                                             <img 

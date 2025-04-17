@@ -5,9 +5,17 @@ const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs').promises;
 const os = require('os');
+const { promisify } = require('util');
+const sleep = promisify(setTimeout);
 
 // Default JWT secret if environment variable is not set
 const JWT_SECRET = process.env.JWT_SECRET || 'hockattendance2025secretkey123';
+
+const MAX_RETRIES = 10; // Maximum number of retries per record
+const RETRY_DELAY = 3000; // 3 seconds between retries
+
+// Add 5 second delay between Python script executions
+const SCRIPT_INTERVAL = 3000; // 5 seconds
 
 // Function to find Python executable
 const findPythonExecutable = () => {
@@ -30,6 +38,7 @@ const findPythonExecutable = () => {
 
 const login = async (req, res) => {
     try {
+        console.log("tes")
         await poolConnect;
         const { username, password } = req.body;
 
@@ -66,12 +75,127 @@ const login = async (req, res) => {
     }
 };
 
+const COMPARISON_DELAY = 5000; // 2 seconds delay between comparisons
+
+const processSingleRecord = async (record, pythonCommand) => {
+    let attempt = 0;
+    while (attempt < MAX_RETRIES) {
+        try {
+            // Create temporary files for the images
+            const regPhotoPath = path.join(os.tmpdir(), `reg_${record.AttendanceId}_${attempt}.jpg`);
+            const attendancePhotoPath = path.join(os.tmpdir(), `att_${record.AttendanceId}_${attempt}.jpg`);
+
+            try {
+                // Write base64 images to temporary files
+                const regPhotoData = record.registration_photo.replace(/^data:image\/\w+;base64,/, '');
+                const attPhotoData = record.attendance_photo.replace(/^data:image\/\w+;base64,/, '');
+                await fs.writeFile(regPhotoPath, regPhotoData, 'base64');
+                await fs.writeFile(attendancePhotoPath, attPhotoData, 'base64');
+
+                const pythonScript = path.join(__dirname, '../utils/face_compare.py');
+                console.log(`Attempt ${attempt + 1} for record ${record.AttendanceId}`);
+
+                const result = await new Promise((resolve, reject) => {
+                    const pythonProcess = spawn(pythonCommand, [
+                        pythonScript,
+                        regPhotoPath,
+                        attendancePhotoPath
+                    ]);
+
+                    let outputData = '';
+                    let errorData = '';
+
+                    pythonProcess.stdout.on('data', (data) => {
+                        outputData += data.toString();
+                    });
+
+                    pythonProcess.stderr.on('data', (data) => {
+                        errorData += data.toString();
+                        console.error('Python error:', data.toString());
+                    });
+
+                    pythonProcess.on('close', async (code) => {
+                        // Clean up temporary files
+                        await Promise.all([
+                            fs.unlink(regPhotoPath).catch(() => {}),
+                            fs.unlink(attendancePhotoPath).catch(() => {})
+                        ]);
+
+                        if (errorData) {
+                            console.error(`Attempt ${attempt + 1} failed with Python error:`, errorData);
+                        }
+
+                        try {
+                            if (outputData.trim()) {
+                                const comparison = JSON.parse(outputData);
+                                resolve(comparison);
+                            } else {
+                                reject(new Error('No output from Python script'));
+                            }
+                        } catch (e) {
+                            reject(new Error('Failed to parse Python output'));
+                        }
+                    });
+
+                    pythonProcess.on('error', reject);
+                });
+
+                // If we get here and result has no error, return the successful result
+                if (!result.error) {
+                    console.log(`Success on attempt ${attempt + 1} for record ${record.AttendanceId}`);
+                    return {
+                        AttendanceId: record.AttendanceId,
+                        EmployeeId: record.EmployeeId,
+                        AttendanceDate: record.AttendanceDate,
+                        AttendanceType: record.AttendanceType,
+                        image: record.attendance_photo,
+                        registration_photo: record.registration_photo,
+                        FaceMatch: result.match,
+                        Confidence: result.confidence,
+                        Error: null
+                    };
+                }
+
+                // If result has an error, throw it to trigger retry
+                throw new Error(result.error);
+
+            } catch (error) {
+                // Clean up temporary files in case of error
+                await Promise.all([
+                    fs.unlink(regPhotoPath).catch(() => {}),
+                    fs.unlink(attendancePhotoPath).catch(() => {})
+                ]);
+                throw error;
+            }
+        } catch (error) {
+            console.error(`Attempt ${attempt + 1} failed for record ${record.AttendanceId}:`, error.message);
+            
+            if (attempt < MAX_RETRIES - 1) {
+                console.log(`Waiting ${RETRY_DELAY/1000} seconds before retry...`);
+                await sleep(RETRY_DELAY);
+                attempt++;
+            } else {
+                console.error(`All attempts failed for record ${record.AttendanceId}`);
+                return {
+                    AttendanceId: record.AttendanceId,
+                    EmployeeId: record.EmployeeId,
+                    AttendanceDate: record.AttendanceDate,
+                    AttendanceType: record.AttendanceType,
+                    image: record.attendance_photo,
+                    registration_photo: record.registration_photo,
+                    FaceMatch: false,
+                    Confidence: 0,
+                    Error: `Failed after ${MAX_RETRIES} attempts: ${error.message}`
+                };
+            }
+        }
+    }
+};
+
 const getFaceComparisonResults = async (req, res) => {
-    const tempFiles = [];
     let pythonCommand;
     
     try {
-        // Try to find Python executable first
         pythonCommand = findPythonExecutable();
         console.log('Using Python command:', pythonCommand);
         
@@ -102,8 +226,6 @@ const getFaceComparisonResults = async (req, res) => {
             ORDER BY ar.created_at DESC
         `;
         
-        console.log('Executing SQL query with dates:', { formattedDateFrom, formattedDateTo });
-        
         const result = await pool.request()
             .input('dateFrom', formattedDateFrom)
             .input('dateTo', formattedDateTo)
@@ -113,104 +235,15 @@ const getFaceComparisonResults = async (req, res) => {
         console.log('SQL result count:', result.recordset.length);
         
         if (result.recordset.length === 0) {
-            console.log('No records found matching criteria');
             return res.json([]);
         }
 
-        const comparisonResults = await Promise.all(
-            result.recordset.map(async (record, index) => {
-                console.log(`Processing record ${index + 1}/${result.recordset.length}`);
-                return new Promise(async (resolve) => {
-                    try {
-                        // Create temporary files for the images
-                        const regPhotoPath = path.join(os.tmpdir(), `reg_${record.AttendanceId}.jpg`);
-                        const attendancePhotoPath = path.join(os.tmpdir(), `att_${record.AttendanceId}.jpg`);
-                        tempFiles.push(regPhotoPath, attendancePhotoPath);
-
-                        // Write base64 images to temporary files
-                        const regPhotoData = record.registration_photo.replace(/^data:image\/\w+;base64,/, '');
-                        const attPhotoData = record.attendance_photo.replace(/^data:image\/\w+;base64,/, '');
-                        
-                        await fs.writeFile(regPhotoPath, regPhotoData, 'base64');
-                        await fs.writeFile(attendancePhotoPath, attPhotoData, 'base64');
-
-                        const pythonScript = path.join(__dirname, '../utils/face_compare.py');
-                        console.log('Python script path:', pythonScript);
-                        
-                        const pythonProcess = spawn(pythonCommand, [
-                            pythonScript,
-                            regPhotoPath,
-                            attendancePhotoPath
-                        ]);
-
-                        let outputData = '';
-                        let errorData = '';
-
-                        pythonProcess.stdout.on('data', (data) => {
-                            outputData += data.toString();
-                        });
-
-                        pythonProcess.stderr.on('data', (data) => {
-                            errorData += data.toString();
-                            console.error('Python error:', data.toString());
-                        });
-
-                        pythonProcess.on('close', async (code) => {
-                            console.log(`Python process exited with code ${code}`);
-                            
-                            // Clean up temporary files
-                            await Promise.all([
-                                fs.unlink(regPhotoPath).catch(() => {}),
-                                fs.unlink(attendancePhotoPath).catch(() => {})
-                            ]);
-
-                            if (errorData) {
-                                console.error('Python script error:', errorData);
-                            }
-                            
-                            let comparison = { match: false, confidence: 0, error: null };
-                            try {
-                                if (outputData.trim()) {
-                                    comparison = JSON.parse(outputData);
-                                    console.log('Face comparison result:', comparison);
-                                } else {
-                                    console.log('No output from Python script');
-                                    comparison.error = 'No output from face comparison';
-                                }
-                            } catch (e) {
-                                console.error('Failed to parse Python output:', e);
-                                comparison.error = 'Failed to parse face comparison results';
-                            }
-
-                            resolve({
-                                AttendanceId: record.AttendanceId,
-                                EmployeeId: record.EmployeeId,
-                                AttendanceDate: record.AttendanceDate,
-                                AttendanceType: record.AttendanceType,
-                                image: record.attendance_photo,
-                                registration_photo: record.registration_photo,
-                                FaceMatch: comparison.match,
-                                Confidence: comparison.confidence,
-                                Error: comparison.error
-                            });
-                        });
-                    } catch (error) {
-                        console.error('Error processing record:', error);
-                        resolve({
-                            AttendanceId: record.AttendanceId,
-                            EmployeeId: record.EmployeeId,
-                            AttendanceDate: record.AttendanceDate,
-                            AttendanceType: record.AttendanceType,
-                            image: record.attendance_photo,
-                            registration_photo: record.registration_photo,
-                            FaceMatch: false,
-                            Confidence: 0,
-                            Error: error.message
-                        });
-                    }
-                });
-            })
-        );
+        // Process records sequentially with retries
+        const comparisonResults = [];
+        for (const record of result.recordset) {
+            const processedResult = await processSingleRecord(record, pythonCommand);
+            comparisonResults.push(processedResult);
+        }
 
         console.log('Final results count:', comparisonResults.length);
         res.json(comparisonResults);
@@ -218,11 +251,6 @@ const getFaceComparisonResults = async (req, res) => {
     } catch (error) {
         console.error('Face comparison error:', error);
         res.status(500).json({ error: error.message || 'Internal server error' });
-    } finally {
-        // Clean up any remaining temporary files
-        for (const file of tempFiles) {
-            fs.unlink(file).catch(() => {});
-        }
     }
 };
 
